@@ -1,11 +1,11 @@
 // secCheckServer — 抖音内容安全检测代理（自研模式）
-// 容器内用 client_key + client_secret 自己换 access_token，再带 X-Token 调官方 text/antidirt。
+// 容器内用 appid + secret 自己换 access_token，再带 X-Token 调官方 text/antidirt。
 // 关键：appid / secret 只存在容器环境变量，绝不进入小程序前端。
 const http = require('http')
 const https = require('https')
 const { URL } = require('url')
 
-const PORT = process.env.PORT || 3000
+const PORT = process.env.PORT || 8000
 const APPID = process.env.APPID || ''
 const APPSECRET = process.env.APPSECRET || ''
 const TOKEN_URL = 'https://developer.toutiao.com/api/apps/v2/token'
@@ -14,7 +14,7 @@ const ANTIDIRT_URL = 'https://developer.toutiao.com/api/v2/tags/text/antidirt'
 // 简单内存 token 缓存
 let tokenCache = { token: '', expireAt: 0 }
 
-function postJson(urlStr, bodyObj) {
+function postJson(urlStr, bodyObj, extraHeaders) {
   return new Promise((resolve, reject) => {
     const u = new URL(urlStr)
     const payload = JSON.stringify(bodyObj)
@@ -23,10 +23,13 @@ function postJson(urlStr, bodyObj) {
         hostname: u.hostname,
         path: u.pathname + u.search,
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Content-Length': Buffer.byteLength(payload)
-        }
+        headers: Object.assign(
+          {
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(payload)
+          },
+          extraHeaders || {}
+        )
       },
       (res) => {
         let data = ''
@@ -63,9 +66,12 @@ async function getAccessToken() {
 
 async function checkText(content) {
   const token = await getAccessToken()
-  const r = await postJson(ANTIDIRT_URL, {
-    tasks: [{ content: content }]
-  })
+  // 官方 antidirt 要求把 access_token 放在 X-Token 请求头（不是 body/URL）
+  const r = await postJson(
+    ANTIDIRT_URL,
+    { tasks: [{ content: content }] },
+    { 'X-Token': token }
+  )
   // 官方返回结构：{ data:[{ code:0, predicts:[{ hit:bool }] }] }
   if (r && Array.isArray(r.data)) {
     const item = r.data[0]
