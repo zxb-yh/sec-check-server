@@ -1,0 +1,12 @@
+{
+  "name": "sec-check-server",
+  "version": "1.0.0",
+  "description": "抖音内容安全检测代理（自研模式，server-side token）",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=14"
+  }
+}
